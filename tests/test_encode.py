@@ -39,9 +39,10 @@ def test_examples_are_pure_palette_and_roundtrip():
         if not name.endswith(".png"):
             continue
         img = Image.open(os.path.join(EXAMPLES, name)).convert("RGB")
-        assert img.size == (400, 300), name
+        w, h = img.size
+        assert (w, h) in ((400, 300), (296, 128), (250, 128)), name
         assert set(c for _, c in img.getcolors()) <= set(PALETTE), name
-        assert decode(encode(img)).tobytes() == img.tobytes(), name
+        assert decode(encode(img, w, h), w, h).tobytes() == img.tobytes(), name
 
 
 def test_strict_rejects_offpalette():

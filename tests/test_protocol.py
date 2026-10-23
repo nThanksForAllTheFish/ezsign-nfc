@@ -17,7 +17,7 @@ class FakeTag:
         if apdu[:2] == b"\xF0\xD2":
             seq = (apdu[2] << 8) | apdu[3]
             assert seq == len(self.data) // 250, "chunks out of order"
-            assert apdu[4] == 250 and len(apdu) == 255
+            assert apdu[4] == len(apdu) - 5 <= 250
             self.data += apdu[5:]
             return b"\x90\x00"
         if apdu == APDU_POLL:
@@ -38,3 +38,26 @@ def test_sequence_and_payload(monkeypatch):
     assert len(data_apdus) == 120
     assert tag.log[4 + 120] == APDU_REFRESH
     assert tag.log[-1] == APDU_POLL
+
+
+def test_short_last_chunk_2in9(monkeypatch):
+    import ezsign.protocol as p
+    monkeypatch.setattr(p.time, "sleep", lambda s: None)
+    frame = bytes(9472)                      # 296x128x2/8
+    tag = FakeTag()
+    EZSign(tag).write(frame)
+    data_apdus = [a for a in tag.log if a[:2] == b"\xF0\xD2"]
+    assert len(data_apdus) == 38
+    assert data_apdus[-1][4] == 222 and len(data_apdus[-1]) == 227
+    assert bytes(tag.data) == frame
+
+
+def test_padded_last_chunk_2in9(monkeypatch):
+    import ezsign.protocol as p
+    monkeypatch.setattr(p.time, "sleep", lambda s: None)
+    frame = bytes(9472)
+    tag = FakeTag()
+    EZSign(tag).write(frame, pad=True)
+    data_apdus = [a for a in tag.log if a[:2] == b"\xF0\xD2"]
+    assert len(data_apdus) == 38 and all(a[4] == 250 for a in data_apdus)
+    assert bytes(tag.data) == frame + bytes(28)

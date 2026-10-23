@@ -15,9 +15,10 @@ fossasia/magic-epaper-app (lib/santek/services/santek_nfc_protocol.dart):
     F0 D4 85 80 00                           REFRESH (panel starts its waveform)
     F0 DE 00 00 01                           POLL; first data byte 0x00 = done
 
-The 2.13" sends 32 chunks (8,000 bytes). The 4.2" frame buffer is 30,000
-bytes = 120 chunks. Whether the 4.2" needs anything beyond the chunk count
-changing is UNVERIFIED until the first run against real hardware; see README.
+Frame sizes: 2.13" 250x128 = 8,000 B = 32 chunks; 4.2" 400x300 = 30,000 B =
+120 chunks; 2.9" 296x128 = 9,472 B = 37 chunks + 222 B. Only the 2.13" is
+verified on hardware. Whether the others need anything beyond the chunk count
+changing (and how the 2.9" wants its short last chunk) is UNVERIFIED; see README.
 """
 from __future__ import annotations
 
@@ -68,11 +69,18 @@ class EZSign:
 
     def write(self, frame: bytes,
               progress: Optional[Callable[[int, int], None]] = None,
-              refresh_timeout_s: float = 60.0) -> float:
-        """Send *frame* and refresh. Returns refresh time in seconds."""
-        if len(frame) % self.chunk:
-            raise ValueError(f"frame length {len(frame)} is not a multiple of {self.chunk}")
-        n = len(frame) // self.chunk
+              refresh_timeout_s: float = 60.0, pad: bool = False) -> float:
+        """Send *frame* and refresh. Returns refresh time in seconds.
+
+        The frame is sent in self.chunk-byte DATA APDUs. If its length is not
+        a multiple of the chunk size (the 2.9" 296x128 panel: 9,472 bytes =
+        37 x 250 + 222), the final APDU is short by default, with Lc equal to
+        the remaining byte count. pad=True instead zero-fills the last chunk
+        to the full size. Which one the 2.9" firmware wants is unverified.
+        """
+        if pad and len(frame) % self.chunk:
+            frame = frame + bytes(self.chunk - len(frame) % self.chunk)
+        n = (len(frame) + self.chunk - 1) // self.chunk
 
         self._send(APDU_SELECT, "SELECT")
         resp = self._send(APDU_VERIFY, "VERIFY", expect_ok=False)
@@ -83,8 +91,8 @@ class EZSign:
         self._send(APDU_INIT, "INIT")
 
         for seq in range(n):
-            apdu = bytes([0xF0, 0xD2, seq >> 8, seq & 0xFF, self.chunk]) + \
-                frame[seq * self.chunk:(seq + 1) * self.chunk]
+            part = frame[seq * self.chunk:(seq + 1) * self.chunk]
+            apdu = bytes([0xF0, 0xD2, seq >> 8, seq & 0xFF, len(part)]) + part
             self._send(apdu, f"DATA{seq:03d}")
             if progress:
                 progress(seq + 1, n)

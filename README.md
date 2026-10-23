@@ -2,7 +2,9 @@
 
 Pixel-exact writer for the **Santek EZ Sign 4.2" four-colour (black/white/red/yellow) NFC e-paper display**, using a PC/SC reader (ACR1252U or similar) instead of the vendor phone app — plus a set of 400×300 example images built for the panel's four inks.
 
-**Status: untested against real hardware.** The protocol below is taken from the working 2.13" BWRY driver in [fossasia/magic-epaper-app](https://github.com/fossasia/magic-epaper-app) (PR [#688](https://github.com/fossasia/magic-epaper-app/pull/688)). The only change assumed for the 4.2" is the frame-buffer size (30,000 bytes = 120 chunks instead of 8,000 = 32). First run will confirm or correct that; see *Verifying*.
+Also drives the 2.9" (296×128) and 2.13" (250×128) four-colour models via `--model`.
+
+**Status: untested against real hardware.** The protocol below is taken from the working 2.13" BWRY driver in [fossasia/magic-epaper-app](https://github.com/fossasia/magic-epaper-app) (PR [#688](https://github.com/fossasia/magic-epaper-app/pull/688)). The only change assumed for the other sizes is the frame-buffer length: 4.2" = 30,000 bytes = 120 chunks; 2.9" = 9,472 bytes = 37 chunks + a 222-byte tail (sent short by default; `--pad` zero-fills it to 250 if the firmware turns out to want that). First run will confirm or correct this; see *Verifying*.
 
 ## Why
 
@@ -38,7 +40,7 @@ ISO 14443-4 (ISO-DEP) APDUs. Any reader or phone that does ISO7816 transceive ca
 | VERIFY | `00 20 00 01 04 20 09 12 10` | fixed 4-byte key; retried once after 300 ms |
 | SELECT | (again) | |
 | INIT | `00 D1 00 00 00` | start image write |
-| DATA ×N | `F0 D2 <seq16> FA <250 bytes>` | seq = 0…N−1; N = 120 for 400×300 |
+| DATA ×N | `F0 D2 <seq16> <Lc> <≤250 bytes>` | seq = 0…N−1; N = 120 for 400×300, 38 for 296×128 (last chunk 222 B, or `--pad`) |
 | REFRESH | `F0 D4 85 80 00` | panel starts its waveform |
 | POLL | `F0 DE 00 00 01` | repeat ~5 Hz; first data byte `00` = done |
 
@@ -58,6 +60,7 @@ Send `examples/ezsign_densetext_400x300.png` first. It's a pixel-font test page:
 | `ezsign_fine_400x300.png` | Floyd–Steinberg per-pixel shading, 1-px detail |
 | `ezsign_namecard_400x300.png` | vCard QR (3-px modules, verified decodable), 8–10 px text |
 | `ezsign_densetext_400x300.png` | native bitmap fonts 4x6…7x13B, 1 glyph px = 1 panel px, ~1,900 chars |
+| `ezsign29_densetext_296x128.png` | the same idea for the 2.9" panel (`--model 2.9`); tests the short last chunk |
 
 `tools/gen_*.py` regenerate them into `examples/` (needs Pillow, numpy; the name card also needs `qrcode` and `opencv-python-headless` for its self-check). `fonts/` holds the X11 misc bitmap fonts converted to PIL format by `tools/convert_x11_fonts.py`. Edit `gen_namecard.py` to put your own name and vCard on the card.
 
