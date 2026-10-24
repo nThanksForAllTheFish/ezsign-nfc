@@ -58,6 +58,11 @@ Send `examples/orientation_400x300.png` first: a big "F", corner labels and a 0/
 
 ## Weather screen
 
+![Weather screen on the 4.2" EZ Sign](docs/weather_on_panel.jpg)
+
+*Live data on the panel, 24 Oct 2026: Open-Meteo weather, Google Pollen (nothing in season), dithered red/yellow leaves.*
+
+
 ```
 python tools/fetch_weather.py weather.json --lat 44.85 --lon -93.47 --zip 55344 --place "EDEN PRAIRIE, MN"
 python tools/gen_weather.py weather.json
