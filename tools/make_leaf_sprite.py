@@ -16,7 +16,7 @@ from PIL import Image, ImageFilter
 K, R, Y = (0, 0, 0), (255, 0, 0), (255, 255, 0)
 BLACK_PENALTY = 0.6     # error-diffusion bias against black inside the leaf
 DARK_V = 45             # only source pixels darker than this (0-255 V) may become black
-OUTLINE = True          # 1-px black ring around the silhouette
+OUTLINE = False         # 1-px black ring around the silhouette (off: softer edge)
 
 
 def main(src, out, size, flip=False):

@@ -184,6 +184,14 @@ def TR(d, xr, y, s, f, c=K):
     w = TW(d, s, f); T(d, xr - w, y, s, f, c); return w
 
 
+def label(d, x, y, s, pad=4):
+    """Black section label, bold, text centred in its box (13 px tall)."""
+    w = TW(d, s, F6B) + 2 * pad
+    d.rectangle([x, y, x + w - 1, y + 12], fill=K)
+    T(d, x + pad, y, s, F6B, Wt)
+    return w
+
+
 def bar(d, x, y, w, h, frac, col, warn=None):
     d.rectangle([x, y, x + w - 1, y + h - 1], outline=K, fill=Wt)
     fw = int(round((w - 2) * max(0, min(1, frac))))
@@ -195,7 +203,7 @@ def bar(d, x, y, w, h, frac, col, warn=None):
 
 def render(data):
     im = Image.new("RGB", (W, H), Wt); d = ImageDraw.Draw(im); d.fontmode = "1"
-    TRACK.update({F5: 1, F6: 1, F6B: 1, F6R: 1, F7: 1, F7B: 1})
+    TRACK.update({F5: 1, F6: 1, F6B: 1, F6R: 0, F7: 1, F7B: 1})
     t = data["today"]
     # ---- header
     HB = 26
@@ -222,7 +230,7 @@ def render(data):
         T(d, 6, y, "Tonight", F6B); T(d, 6 + TW(d, "Tonight ", F6B), y + 2, tonight[:24], F6); y += 12
     # ---- right column: rain (x 186..394)
     X0 = 186; d.line([(180, HB + 2), (180, 158)], fill=K)
-    d.rectangle([X0, 28, X0 + 5 * 14 + 4, 37], fill=K); T(d, X0 + 2, 29, "RAIN CHANCE", F5, Wt)
+    label(d, X0, 28, "RAIN CHANCE")
     rc = t["rain"]
     TR(d, W - 6, 27, f"{rc}%", F7B, Rd if rc >= 60 else K)
     T(d, W - 6 - TW(d, f"{rc}%", F7B) - 4 - TW(d, "today", F4), 33, "today", F4)
@@ -243,7 +251,7 @@ def render(data):
         T(d, x + (bw - TW(d, lab, F5)) // 2, hy + bh + 2, lab, F5)
     # ---- pollen
     py = 85
-    d.rectangle([X0, py, X0 + 5 * 7 + 4, py + 9], fill=K); T(d, X0 + 2, py + 1, "POLLEN", F5, Wt)
+    label(d, X0, py, "POLLEN")
     pol = data["pollen"]
     if pol.get("scale") == "UPI":                       # Google: 0-5 Universal Pollen Index
         head, hot = f"{int(pol['index'])}/5  {pol['level']}", pol["index"] >= 4
@@ -251,7 +259,7 @@ def render(data):
         head, hot = f"{pol['index']:.1f}  {pol['level']}", pol["index"] >= 7.3
     TR(d, W - 6, py - 2, head, F6B, Rd if hot else K)
     rows = [("Tree", pol["tree"]), ("Grass", pol["grass"]), ("Weed", pol["weed"]), ("Mold", pol["mold"])]
-    ry = py + 13
+    ry = py + 16
     for name, v in rows:
         T(d, X0, ry, name, F5)
         if v is None:
