@@ -160,12 +160,26 @@ def leaves(im, spots, on_dark=False):
         im.paste(spr, (x, y), spr)
 
 
+TRACK = {}          # font -> extra px between glyphs; set in render()
+
+
+def TW(d, s, f):
+    """Text width with tracking."""
+    t = TRACK.get(f, 0)
+    return sum(round(d.textlength(ch, font=f)) + t for ch in s) - (t if s else 0)
+
+
 def T(d, x, y, s, f, c=K):
-    d.text((x, y), s, font=f, fill=c); return d.textlength(s, font=f)
+    """Draw text glyph by glyph so the bitmap fonts can be letter-spaced."""
+    t = TRACK.get(f, 0); x0 = x
+    for ch in s:
+        d.text((x, y), ch, font=f, fill=c)
+        x += round(d.textlength(ch, font=f)) + t
+    return x - x0 - (t if s else 0)
 
 
 def TR(d, xr, y, s, f, c=K):
-    w = d.textlength(s, font=f); d.text((xr - w, y), s, font=f, fill=c); return w
+    w = TW(d, s, f); T(d, xr - w, y, s, f, c); return w
 
 
 def bar(d, x, y, w, h, frac, col, warn=None):
@@ -177,6 +191,7 @@ def bar(d, x, y, w, h, frac, col, warn=None):
 
 def render(data):
     im = Image.new("RGB", (W, H), Wt); d = ImageDraw.Draw(im); d.fontmode = "1"
+    TRACK.update({F5: 1, F6: 1, F6B: 1, F7B: 1})
     t = data["today"]
     # ---- header
     HB = 26
@@ -200,13 +215,13 @@ def render(data):
         d.rectangle([6, y, 172, y + 10], fill=Rd); T(d, 9, y + 2, alert[:32].upper(), F5, Wt); y += 12
     tonight = data.get("tonight")
     if tonight:
-        T(d, 6, y, "Tonight", F6B); T(d, 6 + d.textlength("Tonight ", font=F6B), y + 2, tonight[:30], F5); y += 12
+        T(d, 6, y, "Tonight", F6B); T(d, 6 + TW(d, "Tonight ", F6B), y + 2, tonight[:30], F5); y += 12
     # ---- right column: rain (x 186..394)
     X0 = 186; d.line([(180, HB + 2), (180, 158)], fill=K)
     d.rectangle([X0, 28, X0 + 5 * 14 + 4, 37], fill=K); T(d, X0 + 2, 29, "RAIN CHANCE", F5, Wt)
     rc = t["rain"]
     TR(d, W - 6, 27, f"{rc}%", F7B, Rd if rc >= 60 else K)
-    T(d, W - 6 - d.textlength(f"{rc}%", font=F7B) - 4 - d.textlength("today", font=F4), 33, "today", F4)
+    T(d, W - 6 - TW(d, f"{rc}%", F7B) - 4 - TW(d, "today", F4), 33, "today", F4)
     # hourly bars
     hx, hy, bw, bh = X0, 43, 30, 26
     for i, (lab, p) in enumerate(data["rain_hours"][:6]):
@@ -215,8 +230,8 @@ def render(data):
         d.rectangle([x, hy, x + bw - 1, hy + bh - 1], outline=K)
         if fh:
             d.rectangle([x + 1, hy + bh - 1 - fh, x + bw - 2, hy + bh - 2], fill=Rd if p >= 60 else Yl)
-        T(d, x + (bw - d.textlength(f"{p}", font=F4)) // 2, hy + 2 if fh > 10 else hy + bh - 8, f"{p}", F4)
-        T(d, x + (bw - d.textlength(lab, font=F4)) // 2, hy + bh + 2, lab, F4)
+        T(d, x + (bw - TW(d, f"{p}", F4)) // 2, hy + 2 if fh > 10 else hy + bh - 8, f"{p}", F4)
+        T(d, x + (bw - TW(d, lab, F4)) // 2, hy + bh + 2, lab, F4)
     # ---- pollen
     py = 85
     d.rectangle([X0, py, X0 + 5 * 7 + 4, py + 9], fill=K); T(d, X0 + 2, py + 1, "POLLEN", F5, Wt)
@@ -249,15 +264,15 @@ def render(data):
             d.line([(x, sy), (x, H - 11)], fill=K)
         cx = x + cw // 2
         d.rectangle([x + 1, sy, x + cw - 1, sy + 11], fill=K if i else Rd)
-        T(d, cx - d.textlength(day["day"], font=F6B) // 2, sy, day["day"], F6B, Wt)
+        T(d, cx - TW(d, day["day"], F6B) // 2, sy, day["day"], F6B, Wt)
         icon(d, cx - 12, sy + 17, day["icon"])
-        T(d, cx - d.textlength(day.get("cond", ""), font=F4) // 2, sy + 44, day.get("cond", ""), F4)
-        T(d, cx - d.textlength(f"{day['hi']}°", font=F7B) // 2, sy + 54, f"{day['hi']}°", F7B)
-        T(d, cx - d.textlength(f"{day['lo']}°", font=F6) // 2, sy + 69, f"{day['lo']}°", F6, Rd if day["lo"] <= 32 else K)
+        T(d, cx - TW(d, day.get("cond", ""), F4) // 2, sy + 44, day.get("cond", ""), F4)
+        T(d, cx - TW(d, f"{day['hi']}°", F7B) // 2, sy + 54, f"{day['hi']}°", F7B)
+        T(d, cx - TW(d, f"{day['lo']}°", F6) // 2, sy + 69, f"{day['lo']}°", F6, Rd if day["lo"] <= 32 else K)
         p = day["rain"]
         bar(d, x + 5, sy + 84, cw - 10, 8, p / 100, Yl, warn=Rd)
-        T(d, cx - d.textlength(f"{p}%", font=F5) // 2, sy + 95, f"{p}%", F5, Rd if p >= 60 else K)
-        T(d, cx - d.textlength("rain", font=F4) // 2, sy + 104, "rain" if day["icon"] != "snow" else "snow", F4)
+        T(d, cx - TW(d, f"{p}%", F5) // 2, sy + 95, f"{p}%", F5, Rd if p >= 60 else K)
+        T(d, cx - TW(d, "rain", F4) // 2, sy + 104, "rain" if day["icon"] != "snow" else "snow", F4)
     # ---- fall leaves: two sprites derived from a reference illustration (tools/make_leaf_sprite.py)
     if data.get("leaves", True):
         for name, pos in (("leaf_52.png", (300, 112)), ("leaf_30.png", (356, 136))):
