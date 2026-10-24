@@ -4,9 +4,13 @@ Pixel format (as implemented for the 2.13" BWRY model in
 fossasia/magic-epaper-app, lib/santek/services/santek_image_codec.dart):
 
   * 2 bits per pixel, palette index 0=black 1=white 2=yellow 3=red
-  * column-major, x mirrored:  bit_pos = (x * HEIGHT + y) * 2,
-    where the pixel sampled is image[(WIDTH-1-x), y]
   * MSB first within each byte
+  * pixel ORDER differs by panel. The 2.13" (natively 128 wide, portrait)
+    uses column-major with x mirrored: bit_pos = ((W-1-x) * H + y) * 2.
+    The 4.2" (natively 400 wide) accepted that buffer on 2026-10-24 but
+    displayed it scrambled, so it uses a different order - most likely plain
+    row-major (bit_pos = (y * W + x) * 2). encode() takes a layout argument;
+    see LAYOUTS.
 
 For 400x300 that is 400*300*2/8 = 30,000 bytes.
 
@@ -28,10 +32,10 @@ PALETTE = [
 BLACK, WHITE, YELLOW, RED = range(4)
 
 MODELS = {
-    # name: (width, height)
-    "4.2": (400, 300),
-    "2.13": (250, 128),
-    "2.9": (296, 128),
+    # name: (width, height, default layout)
+    "4.2": (400, 300, "row"),         # layout unverified; col-mirror is WRONG (tested)
+    "2.13": (250, 128, "col-mirror"), # verified by magic-epaper-app
+    "2.9": (296, 128, "col-mirror"),  # guess: same native-portrait family as 2.13
 }
 
 
@@ -45,9 +49,29 @@ def _nearest(rgb):
     return best
 
 
+LAYOUTS = ("row", "row-mirror", "col", "col-mirror")
+
+
+def _bitpos(x, y, width, height, layout):
+    """Bit position of the pixel at image (x, y) for the given layout."""
+    if layout == "row":            # natural raster: y*W + x
+        return (y * width + x) * 2
+    if layout == "row-mirror":     # raster, x mirrored
+        return (y * width + (width - 1 - x)) * 2
+    if layout == "col":            # column-major, column x then row y
+        return (x * height + y) * 2
+    if layout == "col-mirror":     # column-major, x mirrored (2.13" per magic-epaper)
+        return ((width - 1 - x) * height + y) * 2
+    raise ValueError(f"unknown layout {layout!r}; choose from {LAYOUTS}")
+
+
 def encode(img: Image.Image, width: int = 400, height: int = 300,
-           strict: bool = True) -> bytes:
-    """Return the frame buffer for *img*, which must already be width x height."""
+           strict: bool = True, layout: str = "row") -> bytes:
+    """Return the 2-bit frame buffer for *img*, which must be width x height.
+
+    layout: how pixels are ordered in the buffer (see LAYOUTS). "col-mirror" is
+    what the 2.13" uses; the 4.2" is believed to be "row" (unverified).
+    """
     img = img.convert("RGB")
     if img.size != (width, height):
         raise ValueError(f"image is {img.size}, expected {(width, height)}; "
@@ -55,36 +79,32 @@ def encode(img: Image.Image, width: int = 400, height: int = 300,
     px = img.load()
     lut = {c: i for i, c in enumerate(PALETTE)}
     buf = bytearray(width * height * 2 // 8)
-    bad = 0
-    for x in range(width):
-        col = width - 1 - x
-        for y in range(height):
-            rgb = px[col, y]
+    for y in range(height):
+        for x in range(width):
+            rgb = px[x, y]
             idx = lut.get(rgb)
             if idx is None:
-                bad += 1
                 if strict:
                     raise ValueError(
-                        f"pixel ({col},{y}) = {rgb} is not one of the four panel "
+                        f"pixel ({x},{y}) = {rgb} is not one of the four panel "
                         "colours; quantize first or pass strict=False")
                 idx = _nearest(rgb)
-            bit = (x * height + y) * 2
+            bit = _bitpos(x, y, width, height, layout)
             buf[bit >> 3] |= idx << (6 - (bit & 7))
     return bytes(buf)
 
 
-def decode(buf: bytes, width: int = 400, height: int = 300) -> Image.Image:
+def decode(buf: bytes, width: int = 400, height: int = 300,
+           layout: str = "row") -> Image.Image:
     """Inverse of encode(); useful for round-trip tests and for inspecting dumps."""
     if len(buf) != width * height * 2 // 8:
         raise ValueError(f"buffer is {len(buf)} bytes, expected {width*height*2//8}")
     img = Image.new("RGB", (width, height))
     px = img.load()
-    for x in range(width):
-        col = width - 1 - x
-        for y in range(height):
-            bit = (x * height + y) * 2
-            idx = (buf[bit >> 3] >> (6 - (bit & 7))) & 3
-            px[col, y] = PALETTE[idx]
+    for y in range(height):
+        for x in range(width):
+            bit = _bitpos(x, y, width, height, layout)
+            px[x, y] = PALETTE[(buf[bit >> 3] >> (6 - (bit & 7))) & 3]
     return img
 
 

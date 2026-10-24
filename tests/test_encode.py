@@ -3,7 +3,7 @@ import random
 
 from PIL import Image
 
-from ezsign import PALETTE, decode, encode
+from ezsign import LAYOUTS, PALETTE, decode, encode
 
 HERE = os.path.dirname(__file__)
 EXAMPLES = os.path.join(HERE, "..", "examples")
@@ -14,17 +14,34 @@ def test_frame_size():
     assert len(encode(img)) == 30000
 
 
-def test_bit_layout_matches_reference():
-    # Reference formula from magic-epaper-app's SantekImageCodec: the pixel at
-    # image x = W-1-x, y lands at bit (x*H + y)*2, MSB first.
+def test_col_mirror_matches_magic_epaper_reference():
+    # Reference formula from magic-epaper-app's SantekImageCodec (2.13"): the
+    # pixel at image x = W-1-x, y lands at bit (x*H + y)*2, MSB first.
     W, H = 8, 4
     img = Image.new("RGB", (W, H), PALETTE[1])
-    img.putpixel((W - 1, 0), PALETTE[3])  # x=0,y=0 -> first two bits = 3 (red)
-    img.putpixel((W - 1, 1), PALETTE[0])  # x=0,y=1 -> next two bits = 0 (black)
-    buf = encode(img, W, H)
+    img.putpixel((W - 1, 0), PALETTE[3])  # -> first two bits = 3 (red)
+    img.putpixel((W - 1, 1), PALETTE[0])  # -> next two bits = 0 (black)
+    buf = encode(img, W, H, layout="col-mirror")
     assert buf[0] >> 6 == 3
     assert (buf[0] >> 4) & 3 == 0
     assert (buf[0] >> 2) & 3 == 1
+
+
+def test_row_layout():
+    W, H = 8, 4
+    img = Image.new("RGB", (W, H), PALETTE[1])
+    img.putpixel((0, 0), PALETTE[3]); img.putpixel((1, 0), PALETTE[0]); img.putpixel((0, 1), PALETTE[2])
+    buf = encode(img, W, H, layout="row")
+    assert buf[0] == 0b11_00_01_01          # x=0..3 of row 0
+    assert buf[2] == 0b10_01_01_01          # x=0..3 of row 1
+
+
+def test_all_layouts_roundtrip():
+    rnd = random.Random(2)
+    img = Image.new("RGB", (40, 30))
+    img.putdata([PALETTE[rnd.randrange(4)] for _ in range(40 * 30)])
+    for lay in LAYOUTS:
+        assert decode(encode(img, 40, 30, layout=lay), 40, 30, lay).tobytes() == img.tobytes(), lay
 
 
 def test_roundtrip_random():

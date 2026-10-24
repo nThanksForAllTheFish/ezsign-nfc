@@ -43,6 +43,20 @@ class EZSignError(RuntimeError):
     pass
 
 
+def parse_tlv(data: bytes) -> dict:
+    """INIT replies with simple tag/len/value records. Observed on a 4.2":
+    A0: F0 07 20 02 58 01 90   (01 90 = 400; geometry/model block?)
+    A1: 01 12 00 30 FF FF FF   (firmware?)   B1: 08   B2: 14   B3: 00
+    C0: ASCII serial number    C1: 4-byte UID (matches the ATR)   D1: 01 20 00 ..
+    """
+    out, i = {}, 0
+    while i + 2 <= len(data):
+        tag, ln = data[i], data[i + 1]
+        out[tag] = data[i + 2:i + 2 + ln]
+        i += 2 + ln
+    return out
+
+
 def _hex(b: bytes) -> str:
     return b.hex(" ").upper()
 
@@ -88,7 +102,9 @@ class EZSign:
             time.sleep(0.3)
             self._send(APDU_VERIFY, "VERIFY")
         self._send(APDU_SELECT, "SELECT")
-        self._send(APDU_INIT, "INIT")
+        info = self._send(APDU_INIT, "INIT")
+        for k, v in parse_tlv(info[:-2]).items():
+            log.info("device info tag %02X: %s", k, v.hex(" ").upper() if k != 0xC0 else v.decode("ascii", "replace"))
 
         for seq in range(n):
             part = frame[seq * self.chunk:(seq + 1) * self.chunk]

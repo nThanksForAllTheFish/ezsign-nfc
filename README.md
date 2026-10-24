@@ -4,7 +4,9 @@ Pixel-exact writer for the **Santek EZ Sign 4.2" four-colour (black/white/red/ye
 
 Also drives the 2.9" (296×128) and 2.13" (250×128) four-colour models via `--model`.
 
-**Status: untested against real hardware.** The protocol below is taken from the working 2.13" BWRY driver in [fossasia/magic-epaper-app](https://github.com/fossasia/magic-epaper-app) (PR [#688](https://github.com/fossasia/magic-epaper-app/pull/688)). The only change assumed for the other sizes is the frame-buffer length: 4.2" = 30,000 bytes = 120 chunks; 2.9" = 9,472 bytes = 37 chunks + a 222-byte tail (sent short by default; `--pad` zero-fills it to 250 if the firmware turns out to want that). First run will confirm or correct this; see *Verifying*.
+**Status (2026-10-24): protocol verified on a 4.2" via ACR1252U** — SELECT/VERIFY/INIT accepted, 120 chunks accepted, REFRESH completed in 23.6 s. The **pixel layout is not yet confirmed**: the 2.13"-style column-major buffer displays scrambled on the 4.2", so the default for 4.2" is now row-major (`--layout row`), pending a run of `examples/orientation_400x300.png`.
+
+ The protocol below is taken from the working 2.13" BWRY driver in [fossasia/magic-epaper-app](https://github.com/fossasia/magic-epaper-app) (PR [#688](https://github.com/fossasia/magic-epaper-app/pull/688)). The only change assumed for the other sizes is the frame-buffer length: 4.2" = 30,000 bytes = 120 chunks; 2.9" = 9,472 bytes = 37 chunks + a 222-byte tail (sent short by default; `--pad` zero-fills it to 250 if the firmware turns out to want that). First run will confirm or correct this; see *Verifying*.
 
 ## Why
 
@@ -46,11 +48,13 @@ ISO 14443-4 (ISO-DEP) APDUs. Any reader or phone that does ISO7816 transceive ca
 
 All replies end `90 00` on success.
 
-**Frame buffer**: 2 bits/pixel, palette index `0=black 1=white 2=yellow 3=red`, **column-major with x mirrored**: the pixel at image `(W−1−x, y)` lands at bit position `(x·H + y)·2`, MSB first. `ezsign/encode.py` has `encode()`/`decode()` and the layout is pinned by `tests/test_encode.py`.
+**Frame buffer**: 2 bits/pixel, palette index `0=black 1=white 2=yellow 3=red`, MSB first. Pixel *order* is per model (`--layout`): the 2.13" uses `col-mirror` (pixel `(W−1−x, y)` at bit `(x·H + y)·2`, per magic-epaper-app); the 4.2" rejects that visually and is assumed `row` (`(y·W + x)·2`) until `orientation_400x300.png` confirms it. `ezsign/encode.py` has `encode()`/`decode()` for all four layouts, pinned by `tests/test_encode.py`.
+
+**INIT reply** is a TLV block with device info; `-v` prints it. On a 4.2": `A0 = F0 07 20 02 58 01 90` (0x0190 = 400, so geometry is probably in here), `C0` = ASCII serial, `C1` = 4-byte UID matching the ATR.
 
 ## Verifying
 
-Send `examples/ezsign_densetext_400x300.png` first. It's a pixel-font test page: the 100-column ruler along the bottom edge and the 4x6 text block tell you immediately whether the write was 1:1 (a stray-pixel count of zero under a loupe is the goal). If the REFRESH is rejected or the panel stays blank, the 4.2" differs from the 2.13" by more than chunk count — the APK is the next place to look (`jadx`, grep for `F0D2`, `D27600008501`, `20091210`).
+Send `examples/orientation_400x300.png` first: a big "F", corner labels and a 0/1/2/3 colour strip, so one photo tells you whether the layout, mirror and palette indices are right. Then `examples/ezsign_densetext_400x300.png`. It's a pixel-font test page: the 100-column ruler along the bottom edge and the 4x6 text block tell you immediately whether the write was 1:1 (a stray-pixel count of zero under a loupe is the goal). If the REFRESH is rejected or the panel stays blank, the 4.2" differs from the 2.13" by more than chunk count — the APK is the next place to look (`jadx`, grep for `F0D2`, `D27600008501`, `20091210`).
 
 ## Examples and generators
 
