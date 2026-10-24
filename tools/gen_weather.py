@@ -293,7 +293,7 @@ def render(data):
         T(d, cx - TW(d, "rain", F5) // 2, sy + 104, "rain" if day["icon"] != "snow" else "snow", F5)
     # ---- fall leaves: two sprites derived from a reference illustration (tools/make_leaf_sprite.py)
     if data.get("leaves", True):
-        for name, pos in (("leaf_52.png", (300, 112)), ("leaf_30.png", (356, 136))):
+        for name, pos in (("leaf_52.png", (296, 112)), ("leaf_38.png", (343, 128))):
             path = os.path.join(HERE, "..", "assets", name)
             if os.path.exists(path):
                 spr = Image.open(path).convert("RGBA"); im.paste(spr, pos, spr)
