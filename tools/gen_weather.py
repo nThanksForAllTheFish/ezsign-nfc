@@ -31,8 +31,8 @@ SAMPLE = {
     "alert": "Frost advisory 2-8 AM",
     "tonight": "Clearing, low 36°",
     "rain_hours": [("12p", 10), ("3p", 20), ("6p", 35), ("9p", 45), ("12a", 30), ("3a", 10)],
-    "pollen": {"index": 3.4, "level": "LOW-MED", "tree": 1, "grass": 0, "weed": 3, "mold": 4,
-               "top": "Ragweed, Mold"},
+    "pollen": {"index": 3, "scale": "UPI", "level": "MODERATE", "tree": 1, "grass": 0, "weed": 3, "mold": None,
+               "top": "Ragweed, Mugwort", "source": "Google Pollen"},
     "week": [
         {"day": "SUN", "icon": "rain",   "cond": "Showers",  "hi": 49, "lo": 38, "rain": 70},
         {"day": "MON", "icon": "cloud",  "cond": "Cloudy",   "hi": 45, "lo": 33, "rain": 30},
@@ -266,7 +266,8 @@ def render(data):
                 spr = Image.open(path).convert("RGBA"); im.paste(spr, pos, spr)
     # footer
     d.rectangle([0, H - 10, W, H], fill=K)
-    T(d, 3, H - 8, f"Updated {data['updated']}  ·  Open-Meteo / Pollen.com", F4, Wt)
+    src = "Open-Meteo" + (f" / {pol['source']}" if pol.get("source") else "")
+    T(d, 3, H - 8, f"Updated {data['updated']}  ·  {src}", F4, Wt)
     TR(d, W - 3, H - 8, "EZ Sign 4.2\" · 400x300 · 4-color", F4, Wt)
     assert set(c for _, c in im.getcolors()) <= {K, Wt, Rd, Yl}, "off-palette pixel"
     return im

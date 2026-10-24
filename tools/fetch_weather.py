@@ -62,7 +62,7 @@ def pollen(zip_code):
     return {"index": idx, "level": level,
             "tree": seg if "tree" in types else 0, "grass": seg if "grass" in types else 0,
             "weed": seg if "weed" in types or "ragweed" in types else 0, "mold": None,
-            "top": ", ".join(t["Name"] for t in today.get("Triggers", [])[:3]) or "none"}
+            "top": ", ".join(t["Name"] for t in today.get("Triggers", [])[:3]) or "none", "source": "Pollen.com"}
 
 
 def pollen_google(lat, lon, key):
@@ -85,7 +85,7 @@ def pollen_google(lat, lon, key):
                     key=lambda pl: -pl["indexInfo"]["value"])
     top = ", ".join(pl["displayName"] for pl in plants[:3]) or "none in season"
     return {"index": idx, "scale": "UPI", "level": level, "tree": tree, "grass": grass, "weed": weed,
-            "mold": None, "top": top}
+            "mold": None, "top": top, "source": "Google Pollen"}
 
 
 NO_POLLEN = {"index": 0.0, "level": "N/A", "tree": None, "grass": None, "weed": None, "mold": None, "top": "no data"}
