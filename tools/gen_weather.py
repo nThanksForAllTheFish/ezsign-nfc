@@ -187,6 +187,8 @@ def bar(d, x, y, w, h, frac, col, warn=None):
     fw = int(round((w - 2) * max(0, min(1, frac))))
     if fw:
         d.rectangle([x + 1, y + 1, x + fw, y + h - 2], fill=(warn or col) if (warn and frac >= 0.6) else col)
+        for yy in range(y + 1, y + h - 1, 2):                 # dotted edge marks the fill level
+            d.point((x + fw, yy), fill=K)
 
 
 def render(data):
@@ -229,8 +231,13 @@ def render(data):
         fh = int(round(bh * p / 100))
         d.rectangle([x, hy, x + bw - 1, hy + bh - 1], outline=K)
         if fh:
-            d.rectangle([x + 1, hy + bh - 1 - fh, x + bw - 2, hy + bh - 2], fill=Rd if p >= 60 else Yl)
-        T(d, x + (bw - TW(d, f"{p}", F5)) // 2, hy + 2 if fh > 10 else hy + bh - 9, f"{p}", F5)
+            top = hy + bh - 1 - fh
+            d.rectangle([x + 1, top, x + bw - 2, hy + bh - 2], fill=Rd if p >= 60 else Yl)
+            for xx in range(x + 1, x + bw - 1, 2):            # dotted edge marks the fill level
+                d.point((xx, top), fill=K)
+        top = hy + bh - 1 - fh
+        ny = top + 2 if fh > 12 else (top - 9 if fh else hy + bh - 10)   # inside the fill, or just above its edge
+        T(d, x + (bw - TW(d, f"{p}", F5)) // 2, ny, f"{p}", F5)
         T(d, x + (bw - TW(d, lab, F5)) // 2, hy + bh + 2, lab, F5)
     # ---- pollen
     py = 85
