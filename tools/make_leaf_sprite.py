@@ -15,6 +15,7 @@ from PIL import Image, ImageFilter
 
 K, R, Y = (0, 0, 0), (255, 0, 0), (255, 255, 0)
 BODY_SAT = 150          # min HSV saturation (0-255) for a pixel to count as leaf body
+STEM_V = 150            # duller brown stem pixels: accepted at lower saturation when darker than this
 MAX_HOLE = 16           # fill enclosed gaps only up to this many pixels (true highlights, not sinuses)
 BLACK_PENALTY = 0.6     # error-diffusion bias against black inside the leaf
 DARK_V = 45             # only source pixels darker than this (0-255 V) may become black
@@ -39,7 +40,8 @@ def main(src, out, size, flip=False):
     hh, s, v = h[..., 0], h[..., 1], h[..., 2]
     # warm, well-saturated leaf body or dark outline; the pale glow some
     # illustrations paint around the leaf (S < ~150, V > 215) is excluded
-    mask = (((hh < 50) | (hh > 235)) & (s > BODY_SAT)) | (v < 70)
+    warm_px = (hh < 50) | (hh > 235)
+    mask = (warm_px & (s > BODY_SAT)) | (v < 70) | (warm_px & (s > 90) & (v < STEM_V))   # body | outline | dull stem
     # keep only the component containing the centre; fill holes
     m = Image.fromarray((mask * 255).astype(np.uint8))
     m = m.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
@@ -50,9 +52,10 @@ def main(src, out, size, flip=False):
     if not mask[cy, cx]:
         yy, xx = np.nonzero(mask); i = np.argmin((yy - cy) ** 2 + (xx - cx) ** 2); cy, cx = yy[i], xx[i]
     seen[cy, cx] = True; q.append((cy, cx))
+    N8 = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dy or dx]
     while q:
         y, x = q.popleft()
-        for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for dy, dx in N8:                                     # 8-connected: keeps a thin diagonal stem
             ny, nx = y + dy, x + dx
             if 0 <= ny < Hh and 0 <= nx < Ww and mask[ny, nx] and not seen[ny, nx]:
                 seen[ny, nx] = True; q.append((ny, nx))
