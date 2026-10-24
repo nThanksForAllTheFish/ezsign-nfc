@@ -4,9 +4,9 @@ Pixel-exact writer for the **Santek EZ Sign 4.2" four-colour (black/white/red/ye
 
 Also drives the 2.9" (296×128) and 2.13" (250×128) four-colour models via `--model`.
 
-**Status (2026-10-24): working on a 4.2" via ACR1252U on macOS.** Full APDU sequence accepted, 120 chunks, refresh in ~24 s, orientation pattern displays correctly with layout `row-mirror`. 2.9" and 2.13" layouts still to be confirmed on hardware.
+**Status (2026-10-24): working on the 4.2" and 2.9" via ACR1252U on macOS.** Same command set on both; 4.2" = 120 chunks, layout `row-mirror`, refresh ~24 s; 2.9" = 37 chunks + a short 222-byte chunk (accepted as-is), layout `col`. Text pages come through pixel-exact with no stray colour. The 2.13" entry is from magic-epaper-app and untested here.
 
- The protocol below is taken from the working 2.13" BWRY driver in [fossasia/magic-epaper-app](https://github.com/fossasia/magic-epaper-app) (PR [#688](https://github.com/fossasia/magic-epaper-app/pull/688)). The only change assumed for the other sizes is the frame-buffer length: 4.2" = 30,000 bytes = 120 chunks; 2.9" = 9,472 bytes = 37 chunks + a 222-byte tail (sent short by default; `--pad` zero-fills it to 250 if the firmware turns out to want that). First run will confirm or correct this; see *Verifying*.
+ The protocol below is taken from the working 2.13" BWRY driver in [fossasia/magic-epaper-app](https://github.com/fossasia/magic-epaper-app) (PR [#688](https://github.com/fossasia/magic-epaper-app/pull/688)). The only change assumed for the other sizes is the frame-buffer length: 4.2" = 30,000 bytes = 120 chunks; 2.9" = 9,472 bytes = 37 chunks + a 222-byte tail, sent short (confirmed working; `--pad` zero-fills instead if ever needed).
 
 ## Why
 
@@ -48,7 +48,7 @@ ISO 14443-4 (ISO-DEP) APDUs. Any reader or phone that does ISO7816 transceive ca
 
 All replies end `90 00` on success.
 
-**Frame buffer**: 2 bits/pixel, palette index `0=black 1=white 2=yellow 3=red`, MSB first. Pixel *order* is per model (`--layout`): the 2.13" uses `col-mirror` (pixel `(W−1−x, y)` at bit `(x·H + y)·2`, per magic-epaper-app); the 4.2" uses `row-mirror` (pixel `(W−1−x, y)` at bit `(y·W + x)·2`), verified with `orientation_400x300.png`; plain `row` gives a mirror image and the column layouts scramble. `ezsign/encode.py` has `encode()`/`decode()` for all four layouts, pinned by `tests/test_encode.py`.
+**Frame buffer**: 2 bits/pixel, palette index `0=black 1=white 2=yellow 3=red`, MSB first. Pixel *order* is per model (`--layout`): the 2.13" uses `col-mirror` (pixel `(W−1−x, y)` at bit `(x·H + y)·2`, per magic-epaper-app); the 4.2" uses `row-mirror` (pixel `(W−1−x, y)` at bit `(y·W + x)·2`) and the 2.9" uses `col` (pixel `(x, y)` at bit `(x·H + y)·2`), both verified with the orientation patterns; the wrong mirror gives a mirror image, the wrong major order scrambles. `ezsign/encode.py` has `encode()`/`decode()` for all four layouts, pinned by `tests/test_encode.py`.
 
 **INIT reply** is a TLV block with device info; `-v` prints it. On a 4.2": `A0 = F0 07 20 02 58 01 90` (0x0190 = 400, so geometry is probably in here), `C0` = ASCII serial, `C1` = 4-byte UID matching the ATR.
 

@@ -10,6 +10,8 @@ fossasia/magic-epaper-app, lib/santek/services/santek_image_codec.dart):
     The 4.2" (natively 400 wide) uses row-major with x mirrored:
     bit_pos = (y * W + (W-1-x)) * 2  -- verified on hardware 2026-10-24
     (plain row-major displays a mirror image; column-major is scrambled).
+    The 2.9" uses column-major WITHOUT the mirror: bit_pos = (x * H + y) * 2
+    -- verified on hardware 2026-10-24 (col-mirror displays a mirror image).
     encode() takes a layout argument; see LAYOUTS.
 
 For 400x300 that is 400*300*2/8 = 30,000 bytes.
@@ -35,7 +37,7 @@ MODELS = {
     # name: (width, height, default layout)
     "4.2": (400, 300, "row-mirror"),  # VERIFIED on hardware 2026-10-24
     "2.13": (250, 128, "col-mirror"), # verified by magic-epaper-app
-    "2.9": (296, 128, "col-mirror"),  # guess: same native-portrait family as 2.13
+    "2.9": (296, 128, "col"),         # VERIFIED on hardware 2026-10-24 (col-mirror shows a mirror image)
 }
 
 

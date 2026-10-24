@@ -16,9 +16,9 @@ fossasia/magic-epaper-app (lib/santek/services/santek_nfc_protocol.dart):
     F0 DE 00 00 01                           POLL; first data byte 0x00 = done
 
 Frame sizes: 2.13" 250x128 = 8,000 B = 32 chunks; 4.2" 400x300 = 30,000 B =
-120 chunks; 2.9" 296x128 = 9,472 B = 37 chunks + 222 B. Only the 2.13" is
-verified on hardware. Whether the others need anything beyond the chunk count
-changing (and how the 2.9" wants its short last chunk) is UNVERIFIED; see README.
+120 chunks; 2.9" 296x128 = 9,472 B = 37 chunks + a short 222-byte chunk.
+Verified on hardware 2026-10-24 for the 4.2" and 2.9" (ACR1252U, macOS):
+same command set for both, the 2.9" accepts the short final chunk as-is.
 """
 from __future__ import annotations
 
