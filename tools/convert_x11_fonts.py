@@ -8,7 +8,7 @@ from PIL import PcfFontFile
 
 SRC = "/usr/share/fonts/X11/misc"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fonts")
-faces = sys.argv[1:] or ["4x6", "5x7", "6x10", "6x13B", "7x13B"]
+faces = sys.argv[1:] or ["4x6", "5x7", "6x10", "6x12", "6x13B", "7x13", "7x13B"]
 for face in faces:
     with gzip.open(os.path.join(SRC, f"{face}-ISO8859-1.pcf.gz"), "rb") as fp:
         PcfFontFile.PcfFontFile(fp).save(os.path.join(OUT, face))
