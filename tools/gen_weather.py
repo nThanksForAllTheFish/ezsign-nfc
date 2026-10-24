@@ -2,9 +2,11 @@
 """Weather screen for the 4.2" EZ Sign (400x300, black/white/red/yellow).
 
     python tools/gen_weather.py                 # renders the built-in sample
-    python tools/gen_weather.py weather.json    # renders fetched data (see fetch_weather.py)
+    python tools/gen_weather.py weather.json    # renders fetched data -> ./weather_live.png
+    python tools/gen_weather.py weather.json out.png
 
-Output: examples/weather_400x300.png (pixel-exact, four colours).
+Output is pixel-exact in the four panel colours. With no arguments the
+built-in sample is rendered to examples/weather_400x300.png.
 
 Design rules for this panel: text in black on white; yellow for sun and
 fill bars; red only for things that want attention (high rain chance, high
@@ -300,6 +302,8 @@ if __name__ == "__main__":
     data = json.load(open(sys.argv[1])) if len(sys.argv) > 1 else SAMPLE
     im = render(data)
     pal = Image.new("P", (1, 1)); pal.putpalette([0, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 0] + [0] * (252 * 3))
-    out = OUT if len(sys.argv) < 3 else sys.argv[2]
+    # Sample data -> the tracked example; live data -> an untracked file in the
+    # current directory, so a fetched render never dirties the git checkout.
+    out = sys.argv[2] if len(sys.argv) > 2 else (OUT if len(sys.argv) == 1 else "weather_live.png")
     im.quantize(palette=pal, dither=Image.Dither.NONE).save(out, optimize=True)
     print("wrote", out)
