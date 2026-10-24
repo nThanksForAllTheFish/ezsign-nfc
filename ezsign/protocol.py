@@ -90,7 +90,7 @@ class EZSign:
         a multiple of the chunk size (the 2.9" 296x128 panel: 9,472 bytes =
         37 x 250 + 222), the final APDU is short by default, with Lc equal to
         the remaining byte count. pad=True instead zero-fills the last chunk
-        to the full size. Which one the 2.9" firmware wants is unverified.
+        to the full size. The 2.9" accepts the short chunk (verified).
         """
         if pad and len(frame) % self.chunk:
             frame = frame + bytes(self.chunk - len(frame) % self.chunk)
