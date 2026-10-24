@@ -56,6 +56,16 @@ All replies end `90 00` on success.
 
 Send `examples/orientation_400x300.png` first: a big "F", corner labels and a 0/1/2/3 colour strip, so one photo tells you whether the layout, mirror and palette indices are right. Then `examples/ezsign_densetext_400x300.png`. It's a pixel-font test page: the 100-column ruler along the bottom edge and the 4x6 text block tell you immediately whether the write was 1:1 (a stray-pixel count of zero under a loupe is the goal). If the REFRESH is rejected or the panel stays blank, the 4.2" differs from the 2.13" by more than chunk count — the APK is the next place to look (`jadx`, grep for `F0D2`, `D27600008501`, `20091210`).
 
+## Weather screen
+
+```
+python tools/fetch_weather.py weather.json --lat 44.85 --lon -93.47 --zip 55344 --place "EDEN PRAIRIE, MN"
+python tools/gen_weather.py weather.json
+python ezsign_write.py examples/weather_400x300.png --reader PICC
+```
+
+Open-Meteo needs no key. Pollen.com's endpoint is unofficial: it gives one 0–12 index plus the top trigger plants, from which the per-type bars are derived; mold isn't reported and shows "no data". Red is reserved for rain chance ≥60%, freezing lows, high pollen and the alert bar (`--alert "text"` or automatic when tonight's low is ≤32 °F).
+
 ## Examples and generators
 
 | Image | What it exercises |
@@ -64,6 +74,7 @@ Send `examples/orientation_400x300.png` first: a big "F", corner labels and a 0/
 | `ezsign_fine_400x300.png` | Floyd–Steinberg per-pixel shading, 1-px detail |
 | `ezsign_namecard_400x300.png` | vCard QR (3-px modules, verified decodable), 8–10 px text |
 | `ezsign_densetext_400x300.png` | native bitmap fonts 4x6…7x13B, 1 glyph px = 1 panel px, ~1,900 chars |
+| `weather_400x300.png` | weather dashboard: today, 6 hourly rain-chance bars, pollen, 7-day strip. `tools/fetch_weather.py` fills it with live Open-Meteo + Pollen.com data, `tools/gen_weather.py` renders it |
 | `ezsign29_densetext_296x128.png` | the same idea for the 2.9" panel (`--model 2.9`); tests the short last chunk |
 
 `tools/gen_*.py` regenerate them into `examples/` (needs Pillow, numpy; the name card also needs `qrcode` and `opencv-python-headless` for its self-check). `fonts/` holds the X11 misc bitmap fonts converted to PIL format by `tools/convert_x11_fonts.py`. Edit `gen_namecard.py` to put your own name and vCard on the card.
