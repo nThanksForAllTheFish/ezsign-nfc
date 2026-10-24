@@ -84,6 +84,82 @@ def icon(d, x, y, kind, s=1):
         for i in range(4): L(3, 7 + i * 4, 21, 7 + i * 4, K)
 
 
+BAYER2 = [[0.125, 0.625], [0.875, 0.375]]   # 2x2 ordered-dither thresholds
+
+# Hand-drawn 25x25 maple leaf (pixel art; '#' leaf, '|' midrib/stem).
+MAPLE_PX = """
+............#............
+...........###...........
+...........#|#...........
+..#.......##|##.......#..
+..##......##|##......##..
+..###....###|###....###..
+...####..###|###..####...
+...#####.###|###.#####...
+....#################....
+.....###############.....
+#....###############....#
+##..#################..##
+#########################
+.#######################.
+..#####################..
+...#######.#|#.#######...
+....####...#|#...####....
+.....##....#|#....##.....
+......#....#|#....#......
+...........#|#...........
+............|............
+............|............
+............|............
+............|............
+.............|...........
+""".strip("\n").split("\n")
+
+
+def leaf(size, colour, angle, on_dark=False):
+    """Maple leaf sprite (RGBA, exact palette colours) from the pixel-art bitmap.
+    `angle` is a quarter-turn count (0..3) or 'h'/'v' for a flip -- orientation
+    changes only, never resampling, so every pixel stays crisp. `size` is
+    ignored (kept for call compatibility). On white: black edge + midrib; on a
+    dark background: coloured silhouette with the midrib left dark."""
+    from PIL import ImageFilter
+    h, w = len(MAPLE_PX), len(MAPLE_PX[0])
+    body = Image.new("L", (w + 2, h + 2), 0); rib = Image.new("L", (w + 2, h + 2), 0)
+    for y, row in enumerate(MAPLE_PX):
+        for x, ch in enumerate(row):
+            if ch == "#": body.putpixel((x + 1, y + 1), 255)
+            if ch == "|": rib.putpixel((x + 1, y + 1), 255)
+    spr = Image.new("RGBA", body.size, (0, 0, 0, 0))
+    fill = Image.new("RGBA", body.size, (0, 0, 0, 0))
+    if isinstance(colour, str):                      # dithered mix of red and yellow
+        frac_red = {"amber": 0.25, "orange": 0.5, "red-orange": 0.75}[colour]
+        for yy in range(body.height):
+            for xx in range(body.width):
+                fill.putpixel((xx, yy), (Rd if BAYER2[yy % 2][xx % 2] < frac_red else Yl) + (255,))
+        rib_col = Rd
+    else:
+        fill.paste(colour + (255,), [0, 0, body.width, body.height]); rib_col = colour
+    spr.paste(fill, mask=body)
+    colour = rib_col
+    if not on_dark:
+        edge = body.filter(ImageFilter.MaxFilter(3)); edge.paste(0, mask=body)
+        spr.paste((0, 0, 0, 255), mask=edge)
+        spr.paste((0, 0, 0, 255), mask=rib)
+    else:
+        spr.paste(colour + (255,), mask=rib.point(lambda v: 0))   # leave rib unpainted (background shows)
+    if angle == "h": spr = spr.transpose(Image.FLIP_LEFT_RIGHT)
+    elif angle == "v": spr = spr.transpose(Image.FLIP_TOP_BOTTOM)
+    elif angle: spr = spr.rotate(90 * int(angle), expand=True)
+    return spr
+
+
+def leaves(im, spots, on_dark=False):
+    """spots: [(x, y, size, colour, angle), ...]; pastes leaf sprites onto im."""
+    for x, y, size, colour, angle in spots:
+        spr = leaf(size, colour, angle, on_dark)
+        im.paste(spr, (x, y), spr)
+
+
 def T(d, x, y, s, f, c=K):
     d.text((x, y), s, font=f, fill=c); return d.textlength(s, font=f)
 
@@ -103,16 +179,17 @@ def render(data):
     im = Image.new("RGB", (W, H), Wt); d = ImageDraw.Draw(im); d.fontmode = "1"
     t = data["today"]
     # ---- header
-    d.rectangle([0, 0, W, 17], fill=K)
-    T(d, 5, 2, data["place"], F7B, Wt)
-    TR(d, W - 5, 2, data["date"], F7B, Yl)
+    HB = 26
+    d.rectangle([0, 0, W, HB - 1], fill=K)
+    T(d, 5, 7, data["place"], F7B, Wt)
+    TR(d, W - 5, 7, data["date"], F7B, Yl)
     # ---- today (left column, x 0..175)
-    big = ImageFont.truetype(BIG, 58)
+    big = ImageFont.truetype(BIG, 54)
     temp = f"{t['temp']}"
-    d.text((6, 20), temp, font=big, fill=K)
+    d.text((6, 26), temp, font=big, fill=K)
     tw = d.textlength(temp, font=big)
-    d.text((6 + tw + 1, 26), "°", font=ImageFont.truetype(BIG, 24), fill=K)
-    icon(d, 112, 26, t["icon"], s=2)
+    d.text((6 + tw + 1, 30), "°", font=ImageFont.truetype(BIG, 24), fill=K)
+    icon(d, 118, 32, t["icon"], s=2)
     T(d, 6, 88, t["cond"], F6B)
     y = 102
     T(d, 6, y, f"Feels {t['feels']}°", F6); TR(d, 172, y, f"H {t['hi']}°  L {t['lo']}°", F6, Rd if t["lo"] <= 32 else K); y += 11
@@ -125,13 +202,13 @@ def render(data):
     if tonight:
         T(d, 6, y, "Tonight", F6B); T(d, 6 + d.textlength("Tonight ", font=F6B), y + 2, tonight[:30], F5); y += 12
     # ---- right column: rain (x 186..394)
-    X0 = 186; d.line([(180, 20), (180, 158)], fill=K)
-    d.rectangle([X0, 20, X0 + 5 * 14 + 4, 29], fill=K); T(d, X0 + 2, 21, "RAIN CHANCE", F5, Wt)
+    X0 = 186; d.line([(180, HB + 2), (180, 158)], fill=K)
+    d.rectangle([X0, 28, X0 + 5 * 14 + 4, 37], fill=K); T(d, X0 + 2, 29, "RAIN CHANCE", F5, Wt)
     rc = t["rain"]
-    TR(d, W - 6, 19, f"{rc}%", F7B, Rd if rc >= 60 else K)
-    T(d, W - 6 - d.textlength(f"{rc}%", font=F7B) - 4 - d.textlength("today", font=F4), 25, "today", F4)
+    TR(d, W - 6, 27, f"{rc}%", F7B, Rd if rc >= 60 else K)
+    T(d, W - 6 - d.textlength(f"{rc}%", font=F7B) - 4 - d.textlength("today", font=F4), 33, "today", F4)
     # hourly bars
-    hx, hy, bw, bh = X0, 36, 30, 28
+    hx, hy, bw, bh = X0, 43, 30, 26
     for i, (lab, p) in enumerate(data["rain_hours"][:6]):
         x = hx + i * 35
         fh = int(round(bh * p / 100))
@@ -141,7 +218,7 @@ def render(data):
         T(d, x + (bw - d.textlength(f"{p}", font=F4)) // 2, hy + 2 if fh > 10 else hy + bh - 8, f"{p}", F4)
         T(d, x + (bw - d.textlength(lab, font=F4)) // 2, hy + bh + 2, lab, F4)
     # ---- pollen
-    py = 78
+    py = 85
     d.rectangle([X0, py, X0 + 5 * 7 + 4, py + 9], fill=K); T(d, X0 + 2, py + 1, "POLLEN", F5, Wt)
     pol = data["pollen"]
     lvl = pol["level"]; TR(d, W - 6, py - 2, f"{pol['index']:.1f}  {lvl}", F6B, Rd if pol["index"] >= 7.3 else K)
@@ -157,7 +234,7 @@ def render(data):
             d.rectangle([x, ry, x + 10, ry + 6], fill=(Rd if v >= 4 else Yl) if on else Wt, outline=K)
         TR(d, W - 6, ry, ["None", "Low", "Low", "Med", "High", "V.High"][min(v, 5)], F5, Rd if v >= 4 else K)
         ry += 10
-    T(d, X0, ry + 1, "Top: " + pol["top"], F4)
+    T(d, X0, ry + 1, ("Top: " + pol["top"])[:26], F4)
     # ---- 7-day strip
     sy = 166
     d.line([(0, sy - 2), (W, sy - 2)], fill=K)
@@ -177,6 +254,12 @@ def render(data):
         bar(d, x + 5, sy + 84, cw - 10, 8, p / 100, Yl, warn=Rd)
         T(d, cx - d.textlength(f"{p}%", font=F5) // 2, sy + 95, f"{p}%", F5, Rd if p >= 60 else K)
         T(d, cx - d.textlength("rain", font=F4) // 2, sy + 104, "rain" if day["icon"] != "snow" else "snow", F4)
+    # ---- fall leaves (yellow/red on the black header; a drift under the pollen table)
+    if data.get("leaves", True):
+        leaves(im, [(192, 0, 0, Yl, 0), (222, -1, 0, "orange", 3), (254, 0, 0, "amber", "h"),
+                    (286, -1, 0, Rd, 1)], on_dark=True)
+        leaves(im, [(294, 134, 0, Rd, 0), (320, 137, 0, "orange", 1), (343, 133, 0, "red-orange", "v"),
+                    (368, 136, 0, "amber", 3)])
     # footer
     d.rectangle([0, H - 10, W, H], fill=K)
     T(d, 3, H - 8, f"Updated {data['updated']}  ·  Open-Meteo / Pollen.com", F4, Wt)
