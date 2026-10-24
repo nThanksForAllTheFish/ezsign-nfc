@@ -64,6 +64,8 @@ python tools/gen_weather.py weather.json
 python ezsign_write.py examples/weather_400x300.png --reader PICC
 ```
 
+The two fall leaves are four-ink sprites in `assets/`, made from a reference illustration with `tools/make_leaf_sprite.py` (isolates a leaf by warm-hue saturation, scales it, Floyd–Steinberg dithers the shading onto red + yellow with black outline/veins); point it at any leaf picture on a plain background to make your own. Set `"leaves": false` in the JSON to drop them.
+
 Open-Meteo needs no key. Pollen.com's endpoint is unofficial: it gives one 0–12 index plus the top trigger plants, from which the per-type bars are derived; mold isn't reported and shows "no data". Red is reserved for rain chance ≥60%, freezing lows, high pollen and the alert bar (`--alert "text"` or automatic when tonight's low is ≤32 °F).
 
 ## Examples and generators

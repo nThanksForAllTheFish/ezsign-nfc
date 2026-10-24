@@ -254,12 +254,12 @@ def render(data):
         bar(d, x + 5, sy + 84, cw - 10, 8, p / 100, Yl, warn=Rd)
         T(d, cx - d.textlength(f"{p}%", font=F5) // 2, sy + 95, f"{p}%", F5, Rd if p >= 60 else K)
         T(d, cx - d.textlength("rain", font=F4) // 2, sy + 104, "rain" if day["icon"] != "snow" else "snow", F4)
-    # ---- fall leaves (yellow/red on the black header; a drift under the pollen table)
+    # ---- fall leaves: two sprites derived from a reference illustration (tools/make_leaf_sprite.py)
     if data.get("leaves", True):
-        leaves(im, [(192, 0, 0, Yl, 0), (222, -1, 0, "orange", 3), (254, 0, 0, "amber", "h"),
-                    (286, -1, 0, Rd, 1)], on_dark=True)
-        leaves(im, [(294, 134, 0, Rd, 0), (320, 137, 0, "orange", 1), (343, 133, 0, "red-orange", "v"),
-                    (368, 136, 0, "amber", 3)])
+        for name, pos in (("leaf_52.png", (300, 112)), ("leaf_30.png", (356, 136))):
+            path = os.path.join(HERE, "..", "assets", name)
+            if os.path.exists(path):
+                spr = Image.open(path).convert("RGBA"); im.paste(spr, pos, spr)
     # footer
     d.rectangle([0, H - 10, W, H], fill=K)
     T(d, 3, H - 8, f"Updated {data['updated']}  ·  Open-Meteo / Pollen.com", F4, Wt)
