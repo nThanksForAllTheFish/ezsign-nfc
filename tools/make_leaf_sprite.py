@@ -14,6 +14,9 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 K, R, Y = (0, 0, 0), (255, 0, 0), (255, 255, 0)
+BLACK_PENALTY = 0.6     # error-diffusion bias against black inside the leaf
+DARK_V = 45             # only source pixels darker than this (0-255 V) may become black
+OUTLINE = True          # 1-px black ring around the silhouette
 
 
 def main(src, out, size, flip=False):
@@ -64,6 +67,9 @@ def main(src, out, size, flip=False):
             if 0 <= ny < Hh and 0 <= nx < Ww and not seen[ny, nx] and not outside[ny, nx]:
                 outside[ny, nx] = True; q.append((ny, nx))
     mask = seen | ~outside
+    # pad 1 px so the outline ring has room
+    mask = np.pad(mask, 1); rgb = np.pad(rgb, ((1, 1), (1, 1), (0, 0)), constant_values=1.0)
+    v = np.pad(v, 1, constant_values=255); Hh, Ww = mask.shape
     # error diffusion onto {K, R, Y} inside the mask; "redness" from hue/value
     pal = np.array([K, R, Y], float) / 255
     buf = rgb.copy(); outp = np.zeros((Hh, Ww), int) - 1
@@ -73,8 +79,12 @@ def main(src, out, size, flip=False):
             if not mask[y, x]:
                 continue
             p = np.clip(buf[y, x], -0.3, 1.3)
-            # treat near-white highlights as yellow, don't let them vanish
-            d = ((pal - p) ** 2).sum(1); d[0] += 0.18          # bias against black speckle; keeps black for true outline/veins
+            # interior is red/yellow only; black is reserved for the darkest vein
+            # pixels (and the outline ring added below), so the leaf reads warm
+            d = ((pal - p) ** 2).sum(1)
+            d[0] += BLACK_PENALTY
+            if v[y, x] > DARK_V:
+                d[0] = 9.0
             i = int(np.argmin(d)); outp[y, x] = i
             err = p - pal[i]
             for ddy, ddx, w in ((0, sd, 7 / 16), (1, -sd, 3 / 16), (1, 0, 5 / 16), (1, sd, 1 / 16)):
@@ -86,6 +96,14 @@ def main(src, out, size, flip=False):
         for x in range(Ww):
             if outp[y, x] >= 0:
                 px[x, y] = (K, R, Y)[outp[y, x]] + (255,)
+    if OUTLINE:
+        m = Image.fromarray((mask * 255).astype(np.uint8))
+        ring = np.array(m.filter(ImageFilter.MaxFilter(3))) > 0
+        ring &= ~mask
+        for y in range(Hh):
+            for x in range(Ww):
+                if ring[y, x]:
+                    px[x, y] = K + (255,)
     spr.save(out); print("wrote", out, spr.size, "leaf px:", int(mask.sum()))
 
 
