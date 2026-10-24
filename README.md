@@ -66,7 +66,7 @@ python ezsign_write.py examples/weather_400x300.png --reader PICC
 
 The two fall leaves are four-ink sprites in `assets/`, made from a reference illustration with `tools/make_leaf_sprite.py` (isolates a leaf by warm-hue saturation, scales it, Floyd–Steinberg dithers the shading onto red + yellow with black outline/veins); point it at any leaf picture on a plain background to make your own. Set `"leaves": false` in the JSON to drop them.
 
-Open-Meteo needs no key. Pollen.com's endpoint is unofficial: it gives one 0–12 index plus the top trigger plants, from which the per-type bars are derived; mold isn't reported and shows "no data". Red is reserved for rain chance ≥60%, freezing lows, high pollen and the alert bar (`--alert "text"` or automatic when tonight's low is ≤32 °F).
+Open-Meteo needs no key. Pollen comes from the **Google Pollen API** (`--google-key KEY` or `GOOGLE_POLLEN_KEY`): tree, grass and weed on the 0–5 Universal Pollen Index, which maps straight onto the five-segment bars, plus the top plants in season. To get a key: Google Cloud console → APIs & Services → enable "Pollen API" → Credentials → create an API key (restrict it to the Pollen API). Free tier is thousands of lookups a month; this screen uses one per refresh. Without a key the script falls back to Pollen.com's unofficial endpoint, which is frequently blocked, or `--pollen none`. Mold isn't reported by either and shows "no data". Red is reserved for rain chance ≥60%, freezing lows, high pollen and the alert bar (`--alert "text"` or automatic when tonight's low is ≤32 °F).
 
 ## Examples and generators
 

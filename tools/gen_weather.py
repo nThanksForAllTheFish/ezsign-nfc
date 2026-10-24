@@ -221,7 +221,11 @@ def render(data):
     py = 85
     d.rectangle([X0, py, X0 + 5 * 7 + 4, py + 9], fill=K); T(d, X0 + 2, py + 1, "POLLEN", F5, Wt)
     pol = data["pollen"]
-    lvl = pol["level"]; TR(d, W - 6, py - 2, f"{pol['index']:.1f}  {lvl}", F6B, Rd if pol["index"] >= 7.3 else K)
+    if pol.get("scale") == "UPI":                       # Google: 0-5 Universal Pollen Index
+        head, hot = f"{int(pol['index'])}/5  {pol['level']}", pol["index"] >= 4
+    else:                                                # Pollen.com: 0-12
+        head, hot = f"{pol['index']:.1f}  {pol['level']}", pol["index"] >= 7.3
+    TR(d, W - 6, py - 2, head, F6B, Rd if hot else K)
     rows = [("Tree", pol["tree"]), ("Grass", pol["grass"]), ("Weed", pol["weed"]), ("Mold", pol["mold"])]
     ry = py + 13
     for name, v in rows:
