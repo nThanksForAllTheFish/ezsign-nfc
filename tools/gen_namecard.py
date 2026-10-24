@@ -1,10 +1,13 @@
 import os
 OUT=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","examples")
-# Font paths: DejaVu (fonts-dejavu) and Inter (fonts-inter) on Debian/Ubuntu;
-# override with EZSIGN_FONT_REG / EZSIGN_FONT_BOLD / EZSIGN_FONT_DISPLAY on other systems.
-FONT_REG=os.environ.get("EZSIGN_FONT_REG","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-FONT_BOLD=os.environ.get("EZSIGN_FONT_BOLD","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-FONT_DISPLAY=os.environ.get("EZSIGN_FONT_DISPLAY","/usr/share/fonts/opentype/inter/InterDisplay-ExtraBold.otf")
+# Fonts: DejaVu Sans is bundled in fonts/ (Bitstream Vera licence); override with
+# EZSIGN_FONT_REG / EZSIGN_FONT_BOLD / EZSIGN_FONT_DISPLAY. The display face falls
+# back to DejaVu Bold when Inter is not installed.
+_FONTS=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","fonts")
+FONT_REG=os.environ.get("EZSIGN_FONT_REG") or os.path.join(_FONTS,"DejaVuSans.ttf")
+FONT_BOLD=os.environ.get("EZSIGN_FONT_BOLD") or os.path.join(_FONTS,"DejaVuSans-Bold.ttf")
+_INTER="/usr/share/fonts/opentype/inter/InterDisplay-ExtraBold.otf"
+FONT_DISPLAY=os.environ.get("EZSIGN_FONT_DISPLAY") or (_INTER if os.path.exists(_INTER) else FONT_BOLD)
 import math, numpy as np, qrcode, cv2
 from PIL import Image, ImageDraw, ImageFont
 W,H=400,300

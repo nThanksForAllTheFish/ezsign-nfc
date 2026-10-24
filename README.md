@@ -79,7 +79,7 @@ Open-Meteo needs no key. Pollen.com's endpoint is unofficial: it gives one 0–1
 | `weather_400x300.png` | weather dashboard: today, 6 hourly rain-chance bars, pollen, 7-day strip. `tools/fetch_weather.py` fills it with live Open-Meteo + Pollen.com data, `tools/gen_weather.py` renders it |
 | `ezsign29_densetext_296x128.png` | the same idea for the 2.9" panel (`--model 2.9`); tests the short last chunk |
 
-`tools/gen_*.py` regenerate them into `examples/` (needs Pillow, numpy; the name card also needs `qrcode` and `opencv-python-headless` for its self-check). `fonts/` holds the X11 misc bitmap fonts converted to PIL format by `tools/convert_x11_fonts.py`. Edit `gen_namecard.py` to put your own name and vCard on the card.
+`tools/gen_*.py` regenerate them into `examples/` (needs Pillow, numpy; the name card also needs `qrcode` and `opencv-python-headless` for its self-check). `fonts/` holds the X11 misc bitmap fonts converted to PIL format by `tools/convert_x11_fonts.py`, plus DejaVu Sans / Sans Bold (Bitstream Vera licence) for the large type, so the generators run on macOS without system fonts. Edit `gen_namecard.py` to put your own name and vCard on the card.
 
 **Design rule learned the hard way:** if you must go through the vendor app, give every black pixel at least two black 4-neighbours, or it may come back yellow.
 
@@ -89,4 +89,4 @@ Protocol: the Santek driver in [fossasia/magic-epaper-app](https://github.com/fo
 
 ## Licence
 
-MIT. The X11 bitmap fonts in `fonts/` are public domain.
+MIT. The X11 bitmap fonts in `fonts/` are public domain; DejaVu Sans is under the Bitstream Vera licence (free to redistribute).

@@ -23,9 +23,9 @@ WMO = {0: ("sun", "Clear"), 1: ("sun", "Mostly sun"), 2: ("partly", "Pt cloudy")
 DIRS = "N NE E SE S SW W NW".split()
 
 
-def get(url, headers=None):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 ezsign-nfc", **(headers or {})})
-    with urllib.request.urlopen(req, timeout=20) as r:
+def get(url, headers=None, timeout=20):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) ezsign-nfc", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.load(r)
 
 
@@ -40,10 +40,13 @@ def weather(lat, lon, tz):
 
 def pollen(zip_code):
     url = f"https://www.pollen.com/api/forecast/current/pollen/{zip_code}"
-    try:
-        j = get(url, {"Referer": url, "Accept": "application/json"})
-    except Exception as e:                      # unofficial endpoint; degrade gracefully
-        print("pollen fetch failed:", e, file=sys.stderr)
+    j = None
+    for attempt in range(2):                    # unofficial endpoint, sometimes slow; degrade gracefully
+        try:
+            j = get(url, {"Referer": url, "Accept": "application/json"}, timeout=30); break
+        except Exception as e:
+            print(f"pollen fetch failed (try {attempt + 1}/2):", e, file=sys.stderr)
+    if j is None:
         return {"index": 0.0, "level": "N/A", "tree": None, "grass": None, "weed": None, "mold": None, "top": "no data"}
     today = next(p for p in j["Location"]["periods"] if p["Type"] == "Today")
     idx = float(today["Index"])

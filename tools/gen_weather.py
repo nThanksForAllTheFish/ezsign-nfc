@@ -21,7 +21,7 @@ W, H = 400, 300
 K, Wt, Rd, Yl = (0, 0, 0), (255, 255, 255), (255, 0, 0), (255, 255, 0)
 P = lambda n: ImageFont.load(os.path.join(HERE, "..", "fonts", f"{n}.pil"))
 F4, F5, F6, F6B, F7B = P("4x6"), P("5x7"), P("6x10"), P("6x13B"), P("7x13B")
-BIG = os.environ.get("EZSIGN_FONT_BOLD", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+BIG = os.environ.get("EZSIGN_FONT_BOLD") or os.path.join(HERE, "..", "fonts", "DejaVuSans-Bold.ttf")
 
 SAMPLE = {
     "place": "EDEN PRAIRIE, MN", "date": "SAT OCT 24", "updated": "11:10",
