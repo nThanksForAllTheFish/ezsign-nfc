@@ -14,6 +14,8 @@ import numpy as np
 from PIL import Image, ImageFilter
 
 K, R, Y = (0, 0, 0), (255, 0, 0), (255, 255, 0)
+BODY_SAT = 150          # min HSV saturation (0-255) for a pixel to count as leaf body
+MAX_HOLE = 16           # fill enclosed gaps only up to this many pixels (true highlights, not sinuses)
 BLACK_PENALTY = 0.6     # error-diffusion bias against black inside the leaf
 DARK_V = 45             # only source pixels darker than this (0-255 V) may become black
 OUTLINE = False         # 1-px black ring around the silhouette (off: softer edge)
@@ -35,7 +37,9 @@ def main(src, out, size, flip=False):
         small = small.transpose(Image.FLIP_LEFT_RIGHT)
     h = np.array(small.convert("HSV")).astype(int); rgb = np.array(small).astype(float) / 255
     hh, s, v = h[..., 0], h[..., 1], h[..., 2]
-    mask = (((hh < 50) | (hh > 235)) & (s > 70)) | (v < 70)   # warm leaf body or dark outline
+    # warm, well-saturated leaf body or dark outline; the pale glow some
+    # illustrations paint around the leaf (S < ~150, V > 215) is excluded
+    mask = (((hh < 50) | (hh > 235)) & (s > BODY_SAT)) | (v < 70)
     # keep only the component containing the centre; fill holes
     m = Image.fromarray((mask * 255).astype(np.uint8))
     m = m.filter(ImageFilter.MaxFilter(3)).filter(ImageFilter.MinFilter(3))
@@ -66,7 +70,23 @@ def main(src, out, size, flip=False):
             ny, nx = y + dy, x + dx
             if 0 <= ny < Hh and 0 <= nx < Ww and not seen[ny, nx] and not outside[ny, nx]:
                 outside[ny, nx] = True; q.append((ny, nx))
-    mask = seen | ~outside
+    holes = ~seen & ~outside
+    # fill only small enclosed holes; large ones are gaps between lobes
+    lab = np.zeros_like(holes, dtype=int); n = 0
+    for y0 in range(Hh):
+        for x0 in range(Ww):
+            if holes[y0, x0] and not lab[y0, x0]:
+                n += 1; comp = [(y0, x0)]; lab[y0, x0] = n; qq = deque(comp)
+                while qq:
+                    y, x = qq.popleft()
+                    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        ny, nx = y + dy, x + dx
+                        if 0 <= ny < Hh and 0 <= nx < Ww and holes[ny, nx] and not lab[ny, nx]:
+                            lab[ny, nx] = n; comp.append((ny, nx)); qq.append((ny, nx))
+                if len(comp) <= MAX_HOLE:
+                    for y, x in comp:
+                        seen[y, x] = True
+    mask = seen
     # pad 1 px so the outline ring has room
     mask = np.pad(mask, 1); rgb = np.pad(rgb, ((1, 1), (1, 1), (0, 0)), constant_values=1.0)
     v = np.pad(v, 1, constant_values=255); Hh, Ww = mask.shape
