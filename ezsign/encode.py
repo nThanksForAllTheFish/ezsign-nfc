@@ -7,10 +7,10 @@ fossasia/magic-epaper-app, lib/santek/services/santek_image_codec.dart):
   * MSB first within each byte
   * pixel ORDER differs by panel. The 2.13" (natively 128 wide, portrait)
     uses column-major with x mirrored: bit_pos = ((W-1-x) * H + y) * 2.
-    The 4.2" (natively 400 wide) accepted that buffer on 2026-10-24 but
-    displayed it scrambled, so it uses a different order - most likely plain
-    row-major (bit_pos = (y * W + x) * 2). encode() takes a layout argument;
-    see LAYOUTS.
+    The 4.2" (natively 400 wide) uses row-major with x mirrored:
+    bit_pos = (y * W + (W-1-x)) * 2  -- verified on hardware 2026-10-24
+    (plain row-major displays a mirror image; column-major is scrambled).
+    encode() takes a layout argument; see LAYOUTS.
 
 For 400x300 that is 400*300*2/8 = 30,000 bytes.
 
@@ -33,7 +33,7 @@ BLACK, WHITE, YELLOW, RED = range(4)
 
 MODELS = {
     # name: (width, height, default layout)
-    "4.2": (400, 300, "row"),         # layout unverified; col-mirror is WRONG (tested)
+    "4.2": (400, 300, "row-mirror"),  # VERIFIED on hardware 2026-10-24
     "2.13": (250, 128, "col-mirror"), # verified by magic-epaper-app
     "2.9": (296, 128, "col-mirror"),  # guess: same native-portrait family as 2.13
 }
@@ -70,7 +70,7 @@ def encode(img: Image.Image, width: int = 400, height: int = 300,
     """Return the 2-bit frame buffer for *img*, which must be width x height.
 
     layout: how pixels are ordered in the buffer (see LAYOUTS). "col-mirror" is
-    what the 2.13" uses; the 4.2" is believed to be "row" (unverified).
+    what the 2.13" uses; the 4.2" uses "row-mirror" (verified).
     """
     img = img.convert("RGB")
     if img.size != (width, height):
