@@ -30,7 +30,7 @@ python ezsign_write.py examples/ezsign_densetext_400x300.png -v
 
 Lay the panel flat on the reader, centred on its antenna, and keep it there until the script reports the refresh is done (~25–30 s). `-v` logs every APDU and status word.
 
-Options: `--dry-run out.bin` (encode only), `--quantize` (allow off-palette pixels, nearest-colour mapped — no dithering), `--reader ACR1252` (pick a reader by name substring), `--model 2.13|2.9|4.2`.
+The panel model is read from the display's INIT reply, and the image must match its resolution or the write is refused. Options: `--model 2.13|2.9|4.2` (override or for `--dry-run`), `--dry-run out.bin` (encode only), `--quantize` (allow off-palette pixels, nearest-colour mapped — no dithering), `--reader PICC` (pick a reader by name substring), `--layout` (override the model's pixel order).
 
 ## Protocol
 
@@ -50,7 +50,7 @@ All replies end `90 00` on success.
 
 **Frame buffer**: 2 bits/pixel, palette index `0=black 1=white 2=yellow 3=red`, MSB first. Pixel *order* is per model (`--layout`): the 2.13" uses `col-mirror` (pixel `(W−1−x, y)` at bit `(x·H + y)·2`, per magic-epaper-app); the 4.2" uses `row-mirror` (pixel `(W−1−x, y)` at bit `(y·W + x)·2`) and the 2.9" uses `col` (pixel `(x, y)` at bit `(x·H + y)·2`), both verified with the orientation patterns; the wrong mirror gives a mirror image, the wrong major order scrambles. `ezsign/encode.py` has `encode()`/`decode()` for all four layouts, pinned by `tests/test_encode.py`.
 
-**INIT reply** is a TLV block with device info; `-v` prints it. On a 4.2": `A0 = F0 07 20 02 58 01 90` (0x0190 = 400, so geometry is probably in here), `C0` = ASCII serial, `C1` = 4-byte UID matching the ATR.
+**INIT reply** is a TLV block with device info; `-v` prints it. On a 4.2": `A0 = F0 07 20 02 58 01 90` (0x0190 = 400 = panel width), `C0` = ASCII serial, `C1` = 4-byte UID matching the ATR. Model detection looks for a known panel width (then height) as a big-endian 16-bit value inside `A0`.
 
 ## Verifying
 

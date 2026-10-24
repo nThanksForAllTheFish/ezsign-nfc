@@ -16,7 +16,7 @@ import time
 
 from PIL import Image
 
-from ezsign import LAYOUTS, MODELS, EZSign, EZSignError, decode, encode, quantize
+from ezsign import LAYOUTS, MODELS, EZSign, EZSignError, decode, encode, identify, quantize
 
 log = logging.getLogger("ezsign")
 
@@ -24,7 +24,9 @@ log = logging.getLogger("ezsign")
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("image", help="PNG/BMP, exactly the panel resolution, four exact colours")
-    ap.add_argument("--model", default="4.2", choices=sorted(MODELS), help="panel size (default 4.2)")
+    ap.add_argument("--model", default="auto", choices=["auto", *sorted(MODELS)],
+                    help="panel size; 'auto' (default) reads it from the display, "
+                         "and is required for --dry-run only if the image size is ambiguous")
     ap.add_argument("--quantize", action="store_true",
                     help="nearest-colour map off-palette pixels instead of refusing them")
     ap.add_argument("--dry-run", metavar="OUT.bin",
@@ -41,16 +43,28 @@ def main() -> int:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)-5s %(message)s", datefmt="%H:%M:%S")
 
-    w, h, default_layout = MODELS[args.model]
-    layout = args.layout or default_layout
     img = Image.open(args.image)
-    if args.quantize:
-        img = quantize(img, w, h)
-    frame = encode(img, w, h, strict=not args.quantize, layout=layout)
-    assert decode(frame, w, h, layout).tobytes() == img.convert("RGB").tobytes(), "encoder round-trip failed"
-    log.info("encoded %s -> %d bytes (%d chunks), layout=%s", args.image, len(frame), -(-len(frame) // 250), layout)
+
+    def build_frame(model: str) -> bytes:
+        w, h, default_layout = MODELS[model]
+        layout = args.layout or default_layout
+        src = quantize(img, w, h) if args.quantize else img
+        frame = encode(src, w, h, strict=not args.quantize, layout=layout)
+        assert decode(frame, w, h, layout).tobytes() == src.convert("RGB").tobytes(), "encoder round-trip failed"
+        log.info("encoded %s for %s\" -> %d bytes (%d chunks), layout=%s",
+                 args.image, model, len(frame), -(-len(frame) // 250), layout)
+        return frame
+
+    def model_for_image_size() -> str | None:
+        hits = [m for m, (w, h, _) in MODELS.items() if (w, h) == img.size]
+        return hits[0] if len(hits) == 1 else None
 
     if args.dry_run:
+        model = args.model if args.model != "auto" else model_for_image_size()
+        if model is None:
+            print(f"image is {img.size}; pass --model to say which panel it is for", file=sys.stderr)
+            return 2
+        frame = build_frame(model)
         with open(args.dry_run, "wb") as f:
             f.write(frame)
         log.info("wrote %s", args.dry_run)
@@ -95,7 +109,27 @@ def main() -> int:
             log.info("  sent %3d / %d chunks", i, n)
 
     try:
-        dt = EZSign(transceive).write(frame, progress=progress, pad=args.pad)
+        dev = EZSign(transceive)
+        info = dev.begin()
+        detected = identify(info, MODELS)
+        if args.model == "auto":
+            model = detected
+            if model is None:
+                log.error("could not identify the panel from its INIT reply (A0 = %s); rerun with --model",
+                          info.get(0xA0, b"").hex(" ").upper())
+                return 1
+            log.info("detected panel: %s\" (%dx%d)", model, *MODELS[model][:2])
+        else:
+            model = args.model
+            if detected and detected != model:
+                log.error("display identifies as %s\" but --model %s was given; refusing to write", detected, model)
+                return 1
+        w, h = MODELS[model][:2]
+        if img.size != (w, h):
+            log.error("image is %dx%d but the %s\" panel is %dx%d; refusing to write", *img.size, model, w, h)
+            return 1
+        frame = build_frame(model)
+        dt = dev.send_frame(frame, progress=progress, pad=args.pad)
     except EZSignError as e:
         log.error("%s", e)
         return 1

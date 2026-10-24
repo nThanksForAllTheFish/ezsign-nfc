@@ -57,6 +57,23 @@ def parse_tlv(data: bytes) -> dict:
     return out
 
 
+def identify(info: dict, models: dict) -> Optional[str]:
+    """Guess the panel model from the INIT reply.
+
+    Tag A0 holds the geometry: on a 4.2" it is F0 07 20 02 58 01 90, where
+    01 90 = 400 is the panel width. We look for any model's width (or height)
+    as a big-endian 16-bit value inside A0 and return the model if exactly one
+    matches. *models* is {name: (width, height, layout)}.
+    """
+    a0 = info.get(0xA0, b"")
+    words = {(a0[i] << 8) | a0[i + 1] for i in range(len(a0) - 1)}
+    for pick in (lambda w, h: w, lambda w, h: h):     # width first: 2.9" and 2.13" share h=128
+        hits = [m for m, (w, h, _) in models.items() if pick(w, h) in words]
+        if len(hits) == 1:
+            return hits[0]
+    return None
+
+
 def _hex(b: bytes) -> str:
     return b.hex(" ").upper()
 
@@ -81,31 +98,27 @@ class EZSign:
             raise EZSignError(f"{what}: unexpected response {_hex(resp)}")
         return resp
 
-    def write(self, frame: bytes,
-              progress: Optional[Callable[[int, int], None]] = None,
-              refresh_timeout_s: float = 60.0, pad: bool = False) -> float:
-        """Send *frame* and refresh. Returns refresh time in seconds.
-
-        The frame is sent in self.chunk-byte DATA APDUs. If its length is not
-        a multiple of the chunk size (the 2.9" 296x128 panel: 9,472 bytes =
-        37 x 250 + 222), the final APDU is short by default, with Lc equal to
-        the remaining byte count. pad=True instead zero-fills the last chunk
-        to the full size. The 2.9" accepts the short chunk (verified).
-        """
-        if pad and len(frame) % self.chunk:
-            frame = frame + bytes(self.chunk - len(frame) % self.chunk)
-        n = (len(frame) + self.chunk - 1) // self.chunk
-
+    def begin(self) -> dict:
+        """SELECT / VERIFY / INIT. Returns the parsed INIT device-info TLVs."""
         self._send(APDU_SELECT, "SELECT")
         resp = self._send(APDU_VERIFY, "VERIFY", expect_ok=False)
         if not sw_ok(resp):
             time.sleep(0.3)
             self._send(APDU_VERIFY, "VERIFY")
         self._send(APDU_SELECT, "SELECT")
-        info = self._send(APDU_INIT, "INIT")
-        for k, v in parse_tlv(info[:-2]).items():
-            log.info("device info tag %02X: %s", k, v.hex(" ").upper() if k != 0xC0 else v.decode("ascii", "replace"))
+        info = parse_tlv(self._send(APDU_INIT, "INIT")[:-2])
+        for k, v in info.items():
+            log.info("device info tag %02X: %s", k,
+                     v.decode("ascii", "replace") if k == 0xC0 else v.hex(" ").upper())
+        return info
 
+    def send_frame(self, frame: bytes,
+                   progress: Optional[Callable[[int, int], None]] = None,
+                   refresh_timeout_s: float = 60.0, pad: bool = False) -> float:
+        """DATA chunks + REFRESH + POLL, after begin(). Returns refresh seconds."""
+        if pad and len(frame) % self.chunk:
+            frame = frame + bytes(self.chunk - len(frame) % self.chunk)
+        n = (len(frame) + self.chunk - 1) // self.chunk
         for seq in range(n):
             part = frame[seq * self.chunk:(seq + 1) * self.chunk]
             apdu = bytes([0xF0, 0xD2, seq >> 8, seq & 0xFF, len(part)]) + part
@@ -129,3 +142,10 @@ class EZSign:
         if not saw_any:
             raise EZSignError("lost contact with the display during refresh")
         raise EZSignError(f"refresh did not report completion within {refresh_timeout_s:.0f} s")
+
+    def write(self, frame: bytes,
+              progress: Optional[Callable[[int, int], None]] = None,
+              refresh_timeout_s: float = 60.0, pad: bool = False) -> float:
+        """begin() + send_frame(): the whole write in one call."""
+        self.begin()
+        return self.send_frame(frame, progress, refresh_timeout_s, pad)

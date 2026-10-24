@@ -61,3 +61,14 @@ def test_padded_last_chunk_2in9(monkeypatch):
     data_apdus = [a for a in tag.log if a[:2] == b"\xF0\xD2"]
     assert len(data_apdus) == 38 and all(a[4] == 250 for a in data_apdus)
     assert bytes(tag.data) == frame + bytes(28)
+
+
+def test_identify_from_init_reply():
+    from ezsign import MODELS, identify, parse_tlv
+    init_42 = bytes.fromhex("A007F00720025801 90A1070112 0030FFFFFF B10108B20114B30100"
+                            "C00A53454142303932383330 C104BE2DCD1D D1070120 0000000000".replace(" ", ""))
+    info = parse_tlv(init_42)
+    assert info[0xC0] == b"SEAB092830"
+    assert identify(info, MODELS) == "4.2"
+    assert identify({0xA0: bytes.fromhex("F00720020080 0128")}, MODELS) == "2.9"
+    assert identify({0xA0: b"\x00\x00"}, MODELS) is None
